@@ -1,0 +1,21 @@
+{
+  "category": "<unique_key>",
+  "label": "<emoji + display name>",
+  "order": 1,
+  "skill": "<routing target skill name>",
+  "doc": "<one-line purpose statement>",
+  "depends_on": [],
+  "entries": [
+    {
+      "id": "001",
+      "kind": "spike",
+      "summary": "<short description shown on dashboard>"
+    },
+    {
+      "id": "002",
+      "kind": "batch",
+      "summary": "<short description>",
+      "<custom_field>": "<value used by TEMPLATE.md>"
+    }
+  ]
+}

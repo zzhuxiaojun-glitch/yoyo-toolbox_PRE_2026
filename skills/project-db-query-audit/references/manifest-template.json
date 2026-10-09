@@ -1,0 +1,25 @@
+{
+  "category": "db_optim",
+  "label": "🛠️ 数据库查询优化",
+  "skill": "main-session",
+  "doc": "Reference: <audit.md path>. Entries are independent and parallelizable across sessions; each = 1 PR/commit.",
+  "audit_doc": "doc/.../audit.md",
+  "entries": [
+    {
+      "id": "001",
+      "summary": "<one-line what — under 80 chars>",
+      "severity": "🔴 | 🟠 | 🟡",
+      "scope": [
+        "<file:line> <change pattern>",
+        "<preserved behavior to verify>",
+        "<manual test step>"
+      ],
+      "outputs": [
+        "src/... (modified)",
+        "supabase/migrations/YYYYMMDDNNNNNN_<name>.sql (new — if applicable)"
+      ],
+      "audit_section": "§N.N",
+      "depends_on": []
+    }
+  ]
+}

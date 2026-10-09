@@ -1,0 +1,103 @@
+# <PROJECT_NAME> · 多会话任务推进系统
+
+把这个项目的某块**大批同质独立任务**切成 N 个原子 dispatch，让你能在 **N 个 Claude Code 会话**里同步推进，靠 `status/{task_id}.json` 自动汇总进度。
+
+源 skill：`~/.claude/skills/dispatch-board/`
+
+---
+
+## 目录结构
+
+```
+tasks/
+├── README.md                   ← 本文件
+├── MASTER_PROGRESS.md          ⭐ 总览（人读，dashboard.py 重生）
+├── MASTER_PROGRESS.html        ⭐ 可视化（同上，浏览器打开）
+├── build_dashboard.py          扫 manifest + status → 重生 MD/HTML
+├── pitfalls.md                 ⭐ 踩坑积累（每会话发现新坑就 append）
+├── status/                     每完成一个 dispatch 写一个 {task_id}.json
+└── dispatches/
+    └── <category>/             每个 dispatch 类别一个目录
+        ├── TEMPLATE.md         该类别的标准操作流程（worker 必读）
+        └── manifest.json       该类别下所有原子 entry 列表
+```
+
+---
+
+## 在会话里执行 dispatch（标准入口）
+
+```
+你在新会话说：
+  「执行 dispatch <category>/<id>」
+
+agent 流程：
+  1. Read tasks/dispatches/<category>/TEMPLATE.md
+  2. Read tasks/dispatches/<category>/manifest.json，按 id 取 entry 参数
+  3. 路由到对应底层 skill 跑流程
+  4. 完成 → Write tasks/status/<category>_<id>.json
+  5. cd tasks && python3 build_dashboard.py（重生 MD/HTML）
+  6. git add tasks/ && git pull --rebase && git commit && git push
+```
+
+---
+
+## 多会话并行约定（必读）
+
+| 风险 | 解决 |
+|---|---|
+| `/tmp` 撞车 | 每会话用 `/tmp/<project>-{task_id}/` 隔离 |
+| `git push` race | push 前**永远** `git pull --rebase origin main` |
+| `status/` 撞车 | 文件名唯一；同一台机器同 task_id 绝不开两会话 |
+| 共享 `_progress.json` 撞车 | 不写共享文件；每批写自己的 status JSON |
+| 依赖未就绪 | manifest 顶层 `depends_on`；worker 启动先 check |
+
+---
+
+## status/{task_id}.json schema
+
+```json
+{
+  "task_id": "<category>/<id>",
+  "status": "done | in_progress | blocked | pending",
+  "completed_at": "2026-05-08T14:32:11+09:00",
+  "agent_session": "<conversation hint>",
+  "commit_sha": "abc1234",
+  "outputs": ["<path1>", "<path2>"],
+  "stats": { "<custom>": "..." },
+  "notes": "<exception or blockage reason>",
+  "pitfalls_added": ["pf-2026-05-08-1"]
+}
+```
+
+---
+
+## 重生 dashboard
+
+```bash
+cd tasks && python3 build_dashboard.py
+# wrote MASTER_PROGRESS.md  (~10k chars)
+# wrote MASTER_PROGRESS.html (~25k chars)
+```
+
+幂等 — 多会话同跑结果一样。
+
+---
+
+## 加新 dispatch 类别
+
+```bash
+mkdir -p tasks/dispatches/<new-category>
+cp ~/.claude/skills/dispatch-board/assets/dispatch_TEMPLATE.md.template \
+   tasks/dispatches/<new-category>/TEMPLATE.md
+cp ~/.claude/skills/dispatch-board/assets/manifest.json.template \
+   tasks/dispatches/<new-category>/manifest.json
+# 编辑两个文件填内容；下次跑 build_dashboard.py 自动收录
+```
+
+---
+
+## 三种常见 dispatch 模式
+
+- **chunked-data**（同质批跑）：N 套真题 → N 个 entry，全 parallel
+- **spike-then-batches**（先探后批）：001=spike，002+=按 spike 结果生成
+- **dump-then-fanout**（先 dump 后 N 批）：001=dump，dump 完动态扩 manifest

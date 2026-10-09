@@ -1,0 +1,102 @@
+# <CATEGORY-NAME> dispatch 标准操作
+
+> Worker 必读：[`../../README.md`](../../README.md)（多会话约定） + 触发底层 skill `<SKILL_NAME>`。
+
+---
+
+## 1. 取参数
+
+```bash
+cd <PROJECT_ROOT>
+TASK_ID="$1"  # 如 003
+ENTRY=$(node -e "
+  const m = require('./tasks/dispatches/<CATEGORY>/manifest.json');
+  const e = m.entries.find(x => x.id === '$TASK_ID');
+  if (!e) { console.error('no entry'); process.exit(1); }
+  console.log(JSON.stringify(e));
+")
+echo "$ENTRY" | python3 -m json.tool
+```
+
+字段含义：
+
+| 字段 | 例 | 说明 |
+|---|---|---|
+| `id` | `003` | task 编号 |
+| `kind` | `spike` / `batch` / `single` | entry 类型 |
+| `summary` | `…` | dashboard 显示用 |
+| `<custom>` | `…` | skill 专属字段 |
+
+---
+
+## 2. tmp 目录隔离
+
+```bash
+TMP="/tmp/<PROJECT>-<CATEGORY>-${TASK_ID}"
+rm -rf "$TMP" && mkdir -p "$TMP"
+```
+
+后续所有渲染 / 中间产物**全用** `$TMP/`，绝不用全局公用名。
+
+---
+
+## 3. 标准跑流程（按 entry.kind 分流）
+
+### 3.1 kind: `<some_kind_1>`
+
+```
+<具体步骤>
+```
+
+### 3.2 kind: `<some_kind_2>`
+
+```
+<具体步骤>
+```
+
+---
+
+## 4. 必跑校验
+
+```bash
+<校验脚本，确认产物符合 schema>
+```
+
+---
+
+## 5. 完成后写 status
+
+```bash
+cat > tasks/status/<CATEGORY>_${TASK_ID}.json <<EOF
+{
+  "task_id": "<CATEGORY>/${TASK_ID}",
+  "status": "done",
+  "completed_at": "$(date -Is)",
+  "commit_sha": "$(git rev-parse HEAD)",
+  "outputs": [...],
+  "stats": {...},
+  "notes": "",
+  "pitfalls_added": []
+}
+EOF
+```
+
+---
+
+## 6. dashboard + push
+
+```bash
+cd tasks && python3 build_dashboard.py && cd ..
+git add <data_paths> tasks/status/ tasks/MASTER_PROGRESS.md tasks/MASTER_PROGRESS.html tasks/pitfalls.md
+git pull --rebase origin main
+git commit -m "feat(<scope>): dispatch <CATEGORY>/${TASK_ID} 完成"
+git push origin main
+```
+
+push 失败（race） → `git pull --rebase` → 重跑 `build_dashboard.py` → `git add … && git commit --amend --no-edit && git push`。
+
+---
+
+## 7. 踩坑回写
+
+撞到非显然 bug / 隐藏约定 / 反直觉默认行为 → append `tasks/pitfalls.md` 一条新 ID（`pf-YYYY-MM-DD-N`）+ 三段（症状/原因/解决）+ 触发任务 ID；status 的 `pitfalls_added` 数组写新 ID。
